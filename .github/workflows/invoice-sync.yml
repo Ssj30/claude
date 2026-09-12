@@ -1,0 +1,64 @@
+name: Invoice sync
+
+on:
+  schedule:
+    - cron: "0 13 * * *" # 13:00 UTC daily; adjust to taste
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: invoice-sync
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Needed so we can commit the updated watermark file back below.
+          persist-credentials: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore last-run watermark
+        uses: actions/cache@v4
+        with:
+          path: state/sync_state.json
+          key: invoice-sync-state-${{ github.run_id }}
+          restore-keys: |
+            invoice-sync-state-
+
+      - name: Write credentials from secrets
+        run: |
+          mkdir -p credentials
+          printf '%s' "$GOOGLE_TOKEN_JSON" > credentials/google_token.json
+          if [ -n "$MS_TOKEN_CACHE_JSON" ]; then
+            printf '%s' "$MS_TOKEN_CACHE_JSON" > credentials/ms_token_cache.json
+          fi
+        env:
+          GOOGLE_TOKEN_JSON: ${{ secrets.GOOGLE_TOKEN_JSON }}
+          MS_TOKEN_CACHE_JSON: ${{ secrets.MS_TOKEN_CACHE_JSON }}
+
+      - name: Run sync
+        run: python -m invoice_sync.main
+        env:
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          MS_TENANT_ID: ${{ secrets.MS_TENANT_ID }}
+          MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
+          MS_CLIENT_SECRET: ${{ secrets.MS_CLIENT_SECRET }}
+          OUTLOOK_MAILBOX: ${{ secrets.OUTLOOK_MAILBOX }}
+
+      # actions/cache can't overwrite an existing key, so save under a fresh
+      # run-scoped key each time; restore-keys above picks the newest prefix
+      # match on the next run.
+      - name: Save updated watermark
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state/sync_state.json
+          key: invoice-sync-state-${{ github.run_id }}
