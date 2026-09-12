@@ -24,9 +24,7 @@ from invoice_sync.google_clients import build_drive, build_gmail, build_sheets
 from invoice_sync.models import InvoiceRecord, RawMessage, Source
 from invoice_sync.outlook_auth import get_access_token
 from invoice_sync.sheets_sync import (
-    DUPLICATES_HEADER,
     LEDGER_HEADER,
-    append_duplicate,
     append_invoice,
     ensure_headers,
     load_existing_invoices,
@@ -97,7 +95,6 @@ def run(config: Config | None = None) -> None:
     drive = build_drive(config)
     sheets = build_sheets(config)
     ensure_headers(sheets, config.sheet_id, config.sheet_tab_ledger, LEDGER_HEADER)
-    ensure_headers(sheets, config.sheet_id, config.sheet_tab_duplicates, DUPLICATES_HEADER)
 
     existing = load_existing_invoices(sheets, config.sheet_id, config.sheet_tab_ledger)
 
@@ -113,7 +110,7 @@ def run(config: Config | None = None) -> None:
             if match:
                 duplicates += 1
                 log.info(
-                    "Duplicate: %s $%s from %s (%s) matches row %d — %s",
+                    "Skipping duplicate: %s $%s from %s (%s) matches row %d — %s",
                     record.vendor_raw,
                     record.amount,
                     record.source.value,
@@ -121,15 +118,6 @@ def run(config: Config | None = None) -> None:
                     match.existing_row,
                     match.reason,
                 )
-                if not config.dry_run:
-                    append_duplicate(
-                        sheets,
-                        config.sheet_id,
-                        config.sheet_tab_duplicates,
-                        record,
-                        match.existing_row,
-                        match.reason,
-                    )
                 continue
 
             if config.dry_run:

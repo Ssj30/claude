@@ -60,3 +60,9 @@ def upload_invoice(drive: Resource, root_folder_id: str, record: InvoiceRecord) 
         .execute()
     )
     return uploaded["id"], uploaded.get("webViewLink", "")
+
+
+def trash_file(drive: Resource, file_id: str) -> None:
+    """Soft-deletes a Drive file (recoverable from Trash for 30 days,
+    unlike a permanent delete)."""
+    drive.files().update(fileId=file_id, body={"trashed": True}).execute()

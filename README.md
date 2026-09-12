@@ -1,27 +1,31 @@
 # Invoice Sync
 
-Fetches invoices from Gmail and Outlook, saves the attachments to Google
-Drive, and writes a bookkeeping-ready ledger row to Google Sheets for each
-one — while recognizing when the *same* invoice arrived through both
-mailboxes (or arrived twice from one vendor) so it's never recorded twice.
+Fetches invoices from Gmail and Outlook, saves the PDF attachments to Google
+Drive in their native form, and writes a bookkeeping-ready ledger row to
+Google Sheets for each one — while recognizing when the *same* invoice
+arrived through both mailboxes (or arrived twice from one vendor) so it's
+never recorded twice.
 
 ## How it works
 
 ```
 Gmail  ──┐                                   ┌── Google Drive (PDF filed by year/month)
          ├── extract vendor/amount/date ── dedup check ──┤
-Outlook ─┘                                   └── Google Sheets ledger (+ Duplicates tab)
+Outlook ─┘                                   └── Google Sheets ledger
 ```
 
-1. **Fetch** — searches Gmail and Outlook for recent messages that have an
-   attachment and look invoice-like (subject/body keywords: invoice,
-   receipt, bill, statement, ...). Only new mail since the last run is
+1. **Fetch** — searches Gmail and Outlook for recent messages that have a
+   **PDF** attachment and look invoice-like (subject/body keywords: invoice,
+   receipt, bill, statement, ...). Non-PDF attachments are ignored — this
+   only files actual invoices, not every document that happens to ride
+   along in an invoice-flagged email. Only new mail since the last run is
    pulled (a watermark is kept per mailbox in `state/sync_state.json`).
 2. **Extract** — pulls vendor, amount, currency, invoice date and invoice
    number out of the PDF text (falls back to the email subject/date if the
    PDF has no extractable text, e.g. a scanned image).
-3. **De-duplicate** (`invoice_sync/dedup.py`) — before anything is written,
-   every candidate is checked against everything already in the ledger:
+3. **De-duplicate** (`invoice_sync/dedup.py`) — before anything is written
+   *or uploaded*, every candidate is checked against everything already in
+   the ledger:
    - identical attachment bytes → duplicate, always
    - same invoice number + same amount → duplicate, even with a different
      mailbox or vendor-name spelling
@@ -29,22 +33,27 @@ Outlook ─┘                                   └── Google Sheets ledger 
      name → duplicate — **this is the case that catches the same
      transaction emailing an invoice into both Gmail and Outlook**, since
      the two copies are rarely byte-identical.
-   Everything else is a new transaction.
+
+   A different invoice date (outside the tolerance window) or a different
+   invoice number is treated as a **different transaction even for the same
+   vendor and amount** — a recurring monthly charge is never flagged just
+   because the name and total match.
 4. **Record** — new invoices get uploaded to
-   `<Drive folder>/<year>/<month>/` and appended as a row to the `Invoices`
-   tab. Anything recognized as a duplicate is logged to a `Duplicates` tab
-   instead (with a pointer back to the original row and why it matched), so
-   nothing silently disappears — you can always audit or override it.
+   `<Drive folder>/<year>/<month>/` as the original PDF, and appended as a
+   row to the `Invoices` sheet. A duplicate is simply never uploaded and
+   never written — no separate log, it's dropped at the point of ingestion.
+5. **Clean up existing duplicates** — `invoice_sync/cleanup.py` runs the
+   same matching over everything already in the sheet, keeps the
+   earliest-recorded copy of each real invoice, and **deletes** every later
+   duplicate row from the sheet + trashes its file in Drive. Use this once
+   against an existing sheet, or any time you want to double check.
 
 ## Ledger columns
 
 `Invoices` tab: Synced At, Invoice Date, Vendor, Vendor Key, Amount,
-Currency, Invoice #, Source, Email Subject, Drive Link, Email Link, File
-SHA256, Message ID, Status (`Recorded` / `Needs Review` if amount or date
-couldn't be extracted — check these by hand).
-
-`Duplicates` tab: Detected At, Duplicate Of Row, Vendor, Amount, Currency,
-Source, Reason, Email Subject, Email Link, Message ID.
+Currency, Invoice #, Source, Email Subject, Drive Link, Drive File ID, Email
+Link, File SHA256, Message ID, Status (`Recorded` / `Needs Review` if amount
+or date couldn't be extracted — check these by hand).
 
 ## Setup
 
@@ -52,17 +61,25 @@ Source, Reason, Email Subject, Email Link, Message ID.
 
 1. Create a project at console.cloud.google.com, enable the **Gmail API**,
    **Google Drive API**, and **Google Sheets API**.
-2. Create an OAuth **client ID** (type: Desktop app) under
-   *APIs & Services → Credentials*, download it as
-   `credentials/google_credentials.json`.
+2. Create an OAuth **client ID** under *APIs & Services → Credentials*.
+   - If you'll run the sign-in on your own machine with a browser: type
+     **Desktop app**, then run `python -m invoice_sync.auth_setup google`.
+   - If you're setting this up from a headless environment (a server, a
+     container, no local browser) — this is the one to use if you want me
+     to drive the sign-in interactively: type **TVs and Limited Input
+     devices**, download the JSON as
+     `credentials/google_credentials.json`, and run
+     ```
+     python -m invoice_sync.auth_setup google-device
+     ```
+     It prints a short code and a URL — open the URL on your phone or any
+     browser, enter the code, approve access, and this process picks it up
+     automatically. No browser needed on the machine running the script.
 3. On the OAuth consent screen, add yourself as a test user (or publish the
-   app) and add the three scopes used in `auth_setup.py`.
-4. Run once, locally, to complete the browser consent flow:
-   ```
-   python -m invoice_sync.auth_setup google
-   ```
-   This writes `credentials/google_token.json` (contains a refresh token —
-   keep it secret; for CI, base64/paste its contents into the
+   app) and add the three scopes used in `auth_setup.py`
+   (`gmail.readonly`, `drive.file`, `spreadsheets`).
+4. Either flow writes `credentials/google_token.json` (contains a refresh
+   token — keep it secret; for CI, paste its contents into the
    `GOOGLE_TOKEN_JSON` GitHub secret).
 5. Create (or reuse) a Drive folder for invoices and a Google Sheet for the
    ledger; copy their IDs from the URL into `DRIVE_FOLDER_ID` / `SHEET_ID`.
@@ -72,20 +89,23 @@ Source, Reason, Email Subject, Email Link, Message ID.
 1. In portal.azure.com → *Azure Active Directory → App registrations*,
    create a new app.
 2. Under *API permissions*, add Microsoft Graph **Mail.Read**.
-   - For a fully unattended scheduled run, use the **Application**
-     permission type and have an admin grant consent, then create a
-     **client secret** (*Certificates & secrets*) and set
-     `MS_CLIENT_SECRET`. This is app-only auth — set `OUTLOOK_MAILBOX` to
-     the mailbox you want it to read (e.g. `users/you@yourcompany.com`),
-     since there's no signed-in user.
+   - For a fully unattended scheduled run against a work/Microsoft 365
+     mailbox, use the **Application** permission type and have an admin
+     grant consent, then create a **client secret**
+     (*Certificates & secrets*) and set `MS_CLIENT_SECRET`. This is
+     app-only auth — set `OUTLOOK_MAILBOX` to the mailbox you want it to
+     read (e.g. `users/you@yourcompany.com`), since there's no signed-in
+     user.
    - For a personal/free Outlook.com account (no admin/app-only option),
      use the **Delegated** permission type instead and run:
      ```
      python -m invoice_sync.auth_setup outlook
      ```
-     which does a one-time device-code sign-in and caches a refresh token
-     in `credentials/ms_token_cache.json`. Leave `MS_CLIENT_SECRET` blank
-     so the app uses this cached token instead of client-credentials.
+     This is a device-code sign-in exactly like `google-device` above — it
+     prints a code + URL, you approve on any device, no local browser
+     needed — and it caches a refresh token in
+     `credentials/ms_token_cache.json`. Leave `MS_CLIENT_SECRET` blank so
+     the app uses this cached token instead of client-credentials.
 3. Copy the tenant ID and client ID into `.env`.
 
 ### 3. Configure and run
@@ -96,8 +116,19 @@ pip install -r requirements.txt
 python -m invoice_sync.main
 ```
 
-Set `DRY_RUN=true` for a first pass that logs what it *would* record/flag
-as a duplicate without touching Drive or Sheets.
+Set `DRY_RUN=true` for a first pass that logs what it *would* record/skip as
+a duplicate without touching Drive or Sheets.
+
+If you already have an existing sheet with duplicates in it (from before
+this logic existed, or a manual edit), run the cleanup pass once:
+
+```
+python -m invoice_sync.cleanup --dry-run   # see what it would remove
+python -m invoice_sync.cleanup             # actually delete the duplicates
+```
+
+Deleted Drive files go to Trash (recoverable for 30 days), not permanently
+deleted — empty your Drive trash yourself if you want them gone for good.
 
 ### 4. Schedule it
 
@@ -131,10 +162,11 @@ pip install -r requirements.txt
 pytest invoice_sync/tests
 ```
 
-`tests/test_dedup.py` is the important one — it exercises the exact
-scenario this project exists for (same transaction, two mailboxes, no
-shared invoice number) alongside the negative cases (recurring monthly
-invoices from the same vendor must *not* collide).
+`tests/test_dedup.py` covers the matching rules directly (same transaction,
+two mailboxes, no shared invoice number; recurring same-vendor/same-amount
+invoices on different dates must *not* collide). `tests/test_cleanup.py`
+covers the same rules applied to an existing sheet — keeping the earliest
+row of a duplicate set and flagging the rest for deletion.
 
 ## Limitations / things to review
 
@@ -147,4 +179,11 @@ invoices from the same vendor must *not* collide).
 - Duplicate detection is tuned for "same vendor, same amount, close dates"
   — a vendor that reuses invoice numbers across unrelated customers, or two
   genuinely separate charges of the exact same round amount on the same
-  day, are edge cases worth spot-checking the `Duplicates` tab for.
+  day, are edge cases worth spot-checking before running `cleanup.py`
+  against a sheet you care about (use `--dry-run` first).
+- Because duplicates are now deleted outright (no audit trail tab), a
+  false-positive match means a real invoice's Drive file goes to Trash and
+  its sheet row is removed — recoverable from Drive Trash within 30 days,
+  but the sheet row itself isn't backed up anywhere. Worth keeping the
+  tolerances conservative and dry-running `cleanup.py` before trusting it
+  on a real ledger.

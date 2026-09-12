@@ -19,7 +19,18 @@ Matching runs in three tiers, cheapest/most-certain first:
 
 Tier 3 is the one that actually catches "two mailboxes, same transaction",
 since the Gmail and Outlook copies of an invoice rarely have byte-identical
-attachments (different forwarding wraps them, generates new PDFs, etc.).
+attachments (different forwarding wraps them, generates new PDFs, etc.). It
+deliberately requires BOTH the amount and the date to line up, so a vendor
+that bills the same recurring amount every month is never flagged just
+because the name matches — a different invoice date (outside the tolerance
+window) or a different invoice number means it's a different transaction.
+
+Used two ways:
+  - `find_duplicate`: a newly-fetched invoice against everything already in
+    the ledger, at ingestion time (a match means: don't record it at all).
+  - `find_duplicate_among_existing`: one ledger row against other ledger
+    rows, for the cleanup pass that removes duplicates that already made it
+    into the sheet/Drive.
 """
 
 from __future__ import annotations
@@ -46,7 +57,7 @@ from invoice_sync.models import InvoiceRecord
 @dataclass
 class ExistingInvoice:
     """A previously-recorded invoice, as read back from the sheet, that new
-    invoices get checked against."""
+    invoices (or other ledger rows, during cleanup) get checked against."""
 
     row_number: int
     source: str
@@ -56,6 +67,7 @@ class ExistingInvoice:
     invoice_date: date | None
     invoice_number: str | None
     file_hash: str | None
+    drive_file_id: str | None = None
 
 
 @dataclass
@@ -82,19 +94,22 @@ def _normalize_invoice_number(value: str | None) -> str | None:
     return "".join(ch for ch in value.lower() if ch.isalnum())
 
 
-def find_duplicate(
-    candidate: InvoiceRecord,
+def _find_duplicate_core(
+    *,
+    file_hash: str | None,
+    invoice_number: str | None,
+    amount: float | None,
+    invoice_date: date | None,
+    vendor_normalized: str,
+    source: str,
     existing: list[ExistingInvoice],
     config: DedupConfig,
 ) -> DuplicateMatch | None:
-    """Return the first existing invoice that `candidate` duplicates, or
-    None if it looks like a genuinely new transaction."""
-
-    candidate_number = _normalize_invoice_number(candidate.invoice_number)
+    candidate_number = _normalize_invoice_number(invoice_number)
 
     # Tier 1: identical file content, regardless of everything else.
     for row in existing:
-        if row.file_hash and row.file_hash == candidate.dedup_hash:
+        if file_hash and row.file_hash and row.file_hash == file_hash:
             return DuplicateMatch(
                 existing_row=row.row_number,
                 reason="identical attachment content",
@@ -103,38 +118,76 @@ def find_duplicate(
     # Tier 2: same invoice number + same amount is essentially certain,
     # even if it came through a different mailbox or the vendor name was
     # spelled differently in each email.
-    if candidate_number and candidate.amount is not None:
+    if candidate_number and amount is not None:
         for row in existing:
             row_number = _normalize_invoice_number(row.invoice_number)
             if row_number and row_number == candidate_number and _amounts_match(
-                candidate.amount, row.amount, config.amount_tolerance_cents
+                amount, row.amount, config.amount_tolerance_cents
             ):
                 return DuplicateMatch(
                     existing_row=row.row_number,
-                    reason=f"same invoice number ({candidate.invoice_number}) and amount",
+                    reason=f"same invoice number ({invoice_number}) and amount",
                 )
 
-    # Tier 3: fuzzy match on vendor + amount + date window. This is the tier
-    # that catches "same transaction, two different mailboxes" when the two
-    # copies aren't byte-identical and don't share a machine-readable
-    # invoice number.
+    # Tier 3: fuzzy match on vendor + amount + date window. Both the amount
+    # AND the date must line up — a different date (outside the tolerance
+    # window) means a different transaction even for the exact same vendor
+    # and amount (e.g. a recurring monthly charge).
     best: DuplicateMatch | None = None
     best_score = 0.0
     for row in existing:
-        if not _amounts_match(candidate.amount, row.amount, config.amount_tolerance_cents):
+        if not _amounts_match(amount, row.amount, config.amount_tolerance_cents):
             continue
-        if not _dates_close(candidate.invoice_date, row.invoice_date, config.date_tolerance_days):
+        if not _dates_close(invoice_date, row.invoice_date, config.date_tolerance_days):
             continue
-        score = _similarity(candidate.vendor_normalized, row.vendor_normalized)
+        score = _similarity(vendor_normalized, row.vendor_normalized)
         if score >= config.vendor_fuzzy_threshold and score > best_score:
             best_score = score
-            cross_source = row.source != candidate.source.value
+            cross_source = row.source != source
             best = DuplicateMatch(
                 existing_row=row.row_number,
                 reason=(
                     f"same amount/date, vendor match {score:.0f}% "
-                    f"({'cross-source: ' + row.source + ' vs ' + candidate.source.value if cross_source else 'same source'})"
+                    f"({'cross-source: ' + row.source + ' vs ' + source if cross_source else 'same source'})"
                 ),
             )
 
     return best
+
+
+def find_duplicate(
+    candidate: InvoiceRecord,
+    existing: list[ExistingInvoice],
+    config: DedupConfig,
+) -> DuplicateMatch | None:
+    """Return the first existing invoice that `candidate` duplicates, or
+    None if it looks like a genuinely new transaction."""
+    return _find_duplicate_core(
+        file_hash=candidate.dedup_hash,
+        invoice_number=candidate.invoice_number,
+        amount=candidate.amount,
+        invoice_date=candidate.invoice_date,
+        vendor_normalized=candidate.vendor_normalized,
+        source=candidate.source.value,
+        existing=existing,
+        config=config,
+    )
+
+
+def find_duplicate_among_existing(
+    candidate: ExistingInvoice,
+    existing: list[ExistingInvoice],
+    config: DedupConfig,
+) -> DuplicateMatch | None:
+    """Same matching, but for comparing one already-recorded ledger row
+    against other ledger rows (used by the cleanup pass)."""
+    return _find_duplicate_core(
+        file_hash=candidate.file_hash,
+        invoice_number=candidate.invoice_number,
+        amount=candidate.amount,
+        invoice_date=candidate.invoice_date,
+        vendor_normalized=candidate.vendor_normalized,
+        source=candidate.source,
+        existing=existing,
+        config=config,
+    )

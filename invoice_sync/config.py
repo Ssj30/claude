@@ -54,9 +54,6 @@ class Config:
     sheet_tab_ledger: str = field(
         default_factory=lambda: os.environ.get("SHEET_TAB_LEDGER", "Invoices")
     )
-    sheet_tab_duplicates: str = field(
-        default_factory=lambda: os.environ.get("SHEET_TAB_DUPLICATES", "Duplicates")
-    )
 
     # --- Microsoft / Outlook (app registration, client-credentials or device code) ---
     ms_tenant_id: str = field(default_factory=lambda: os.environ.get("MS_TENANT_ID", ""))
@@ -83,10 +80,11 @@ class Config:
             ["invoice", "receipt", "bill", "statement", "payment confirmation"],
         )
     )
+    # PDF only by default: invoices are almost always PDF, and this keeps
+    # Drive limited to actual invoice documents rather than any attachment
+    # that happens to ride along with an invoice-flagged email.
     attachment_extensions: list[str] = field(
-        default_factory=lambda: _list(
-            "ATTACHMENT_EXTENSIONS", [".pdf", ".png", ".jpg", ".jpeg"]
-        )
+        default_factory=lambda: _list("ATTACHMENT_EXTENSIONS", [".pdf"])
     )
 
     # --- State / dedup ---
