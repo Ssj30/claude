@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  // Local: file:dev.sqlite (see .env.example). Hosting: a file on a persistent disk.
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// One row per shop and module ("countdown", "stock", ...). The JSON is
+// mirrored to an app metafield so the theme blocks can read it.
+model Setting {
+  shop      String
+  module    String
+  json      String
+  updatedAt DateTime @updatedAt
+
+  @@id([shop, module])
+}
+
+model Review {
+  id           String   @id @default(cuid())
+  shop         String
+  productId    String
+  productTitle String
+  productHandle String  @default("")
+  rating       Int
+  title        String   @default("")
+  body         String
+  author       String
+  email        String   @default("")
+  // pending | published | hidden
+  status       String   @default("pending")
+  // form | manual | loox
+  source       String   @default("form")
+  externalId   String?
+  verified     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@unique([shop, externalId])
+  @@index([shop, status])
+  @@index([shop, productId])
+}
+
+// Bookkeeping: every push to n8n, manual or from a webhook.
+model SyncLog {
+  id        String   @id @default(cuid())
+  shop      String
+  kind      String
+  label     String
+  ok        Boolean
+  detail    String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([shop, createdAt])
+}
+
+// Checkout Kit: one thank-you code per order, so a page reload shows the same code.
+model RewardCode {
+  id        String   @id @default(cuid())
+  shop      String
+  orderId   String
+  orderName String   @default("")
+  code      String
+  createdAt DateTime @default(now())
+
+  @@unique([shop, orderId])
+}

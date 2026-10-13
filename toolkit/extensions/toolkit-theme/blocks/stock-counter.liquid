@@ -1,0 +1,67 @@
+{%- comment -%}
+  Product page: "Only 3 left of this model" with an optional bar. When to show it
+  and the wording are set in the 911 Toolkit app → Stock Counter.
+{%- endcomment -%}
+{%- assign tk_st = app.metafields.toolkit.stock.value -%}
+{%- assign tk_product = block.settings.product | default: product -%}
+{%- if tk_product and tk_st and tk_st.enabled -%}
+  {%- capture tk_variants -%}
+    {%- for v in tk_product.variants -%}
+      "{{ v.id }}":{%- if v.inventory_management == 'shopify' and v.inventory_policy != 'continue' -%}{{ v.inventory_quantity }}{%- else -%}null{%- endif -%}{%- unless forloop.last -%},{%- endunless -%}
+    {%- endfor -%}
+  {%- endcapture -%}
+  <div
+    class="tk-stock"
+    id="tk-stock-{{ block.id }}"
+    style="text-align: {{ block.settings.align }};"
+    hidden
+  >
+    <p class="tk-stock__text{% if block.settings.uppercase %} tk-stock__text--upper{% endif %}" style="color: {{ tk_st.color | default: '#111111' }};"></p>
+    <div class="tk-stock__bar" hidden><div class="tk-stock__fill" style="background: {{ tk_st.color | default: '#111111' }};"></div></div>
+    <script type="application/json">
+      {
+        "settings": {{ tk_st | json }},
+        "variants": { {{ tk_variants }} },
+        "current": {{ tk_product.selected_or_first_available_variant.id | json }}
+      }
+    </script>
+  </div>
+  <script src="{{ 'stock-counter.js' | asset_url }}" defer></script>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Stock counter",
+  "target": "section",
+  "stylesheet": "toolkit.css",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Wording, colour and when it shows are set in the 911 Toolkit app → Stock Counter."
+    },
+    {
+      "type": "product",
+      "id": "product",
+      "label": "Product",
+      "autofill": true
+    },
+    {
+      "type": "select",
+      "id": "align",
+      "label": "Alignment",
+      "default": "center",
+      "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "center", "label": "Center" },
+        { "value": "right", "label": "Right" }
+      ]
+    },
+    {
+      "type": "checkbox",
+      "id": "uppercase",
+      "label": "Uppercase text",
+      "default": true
+    }
+  ]
+}
+{% endschema %}

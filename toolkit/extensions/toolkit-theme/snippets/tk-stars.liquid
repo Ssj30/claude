@@ -1,0 +1,8 @@
+{%- comment -%} Renders 5 stars for `rating` (0–5, rounded to the nearest whole star). {%- endcomment -%}
+{%- assign tk_full = rating | default: 0 | round -%}
+<span class="tk-stars" aria-hidden="true">
+  {%- for i in (1..5) -%}
+    {%- if i <= tk_full -%}<span class="tk-stars__on">★</span>{%- else -%}<span class="tk-stars__off">★</span>{%- endif -%}
+  {%- endfor -%}
+</span>
+<span class="tk-sr">{{ rating | default: 0 }} out of 5 stars</span>

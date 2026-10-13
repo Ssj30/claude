@@ -1,0 +1,410 @@
+{%- comment -%} Product page: trust badges and payment logos. All options are right here in the theme editor. {%- endcomment -%}
+<div class="tk-trust" style="--tk-icon: {{ block.settings.icon_size }}px;">
+  <div class="tk-trust__grid">
+    {%- for i in (1..6) -%}
+      {%- assign tk_text_key = 'badge_' | append: i | append: '_text' -%}
+      {%- assign tk_icon_key = 'badge_' | append: i | append: '_icon' -%}
+      {%- assign tk_text = block.settings[tk_text_key] -%}
+      {%- if tk_text != blank -%}
+        <div class="tk-trust__item">
+          {%- render 'tk-icon', name: block.settings[tk_icon_key] -%}
+          <span>{{ tk_text | escape }}</span>
+        </div>
+      {%- endif -%}
+    {%- endfor -%}
+  </div>
+  {%- if block.settings.show_payments and shop.enabled_payment_types.size > 0 -%}
+    {%- if block.settings.payments_heading != blank -%}<p class="tk-trust__heading">{{ block.settings.payments_heading | escape }}</p>{%- endif -%}
+    <div class="tk-trust__pay">
+      {%- for type in shop.enabled_payment_types -%}{{ type | payment_type_svg_tag }}{%- endfor -%}
+    </div>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "Trust badges",
+  "target": "section",
+  "stylesheet": "toolkit.css",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Badges"
+    },
+    {
+      "type": "text",
+      "id": "badge_1_text",
+      "label": "Badge 1 text",
+      "default": "Free Shipping"
+    },
+    {
+      "type": "select",
+      "id": "badge_1_icon",
+      "label": "Badge 1 icon",
+      "default": "truck",
+      "options": [
+        {
+          "value": "truck",
+          "label": "Delivery truck"
+        },
+        {
+          "value": "quality",
+          "label": "Quality medal"
+        },
+        {
+          "value": "money-back",
+          "label": "Money back"
+        },
+        {
+          "value": "handshake",
+          "label": "Handshake"
+        },
+        {
+          "value": "secure",
+          "label": "Lock"
+        },
+        {
+          "value": "shield",
+          "label": "Shield"
+        },
+        {
+          "value": "return",
+          "label": "Returns"
+        },
+        {
+          "value": "gift",
+          "label": "Gift"
+        },
+        {
+          "value": "star",
+          "label": "Star"
+        },
+        {
+          "value": "clock",
+          "label": "Clock"
+        },
+        {
+          "value": "box",
+          "label": "Parcel"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "badge_2_text",
+      "label": "Badge 2 text",
+      "default": "Quality Guaranteed"
+    },
+    {
+      "type": "select",
+      "id": "badge_2_icon",
+      "label": "Badge 2 icon",
+      "default": "quality",
+      "options": [
+        {
+          "value": "truck",
+          "label": "Delivery truck"
+        },
+        {
+          "value": "quality",
+          "label": "Quality medal"
+        },
+        {
+          "value": "money-back",
+          "label": "Money back"
+        },
+        {
+          "value": "handshake",
+          "label": "Handshake"
+        },
+        {
+          "value": "secure",
+          "label": "Lock"
+        },
+        {
+          "value": "shield",
+          "label": "Shield"
+        },
+        {
+          "value": "return",
+          "label": "Returns"
+        },
+        {
+          "value": "gift",
+          "label": "Gift"
+        },
+        {
+          "value": "star",
+          "label": "Star"
+        },
+        {
+          "value": "clock",
+          "label": "Clock"
+        },
+        {
+          "value": "box",
+          "label": "Parcel"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "badge_3_text",
+      "label": "Badge 3 text",
+      "default": "Money Back Guarantee"
+    },
+    {
+      "type": "select",
+      "id": "badge_3_icon",
+      "label": "Badge 3 icon",
+      "default": "money-back",
+      "options": [
+        {
+          "value": "truck",
+          "label": "Delivery truck"
+        },
+        {
+          "value": "quality",
+          "label": "Quality medal"
+        },
+        {
+          "value": "money-back",
+          "label": "Money back"
+        },
+        {
+          "value": "handshake",
+          "label": "Handshake"
+        },
+        {
+          "value": "secure",
+          "label": "Lock"
+        },
+        {
+          "value": "shield",
+          "label": "Shield"
+        },
+        {
+          "value": "return",
+          "label": "Returns"
+        },
+        {
+          "value": "gift",
+          "label": "Gift"
+        },
+        {
+          "value": "star",
+          "label": "Star"
+        },
+        {
+          "value": "clock",
+          "label": "Clock"
+        },
+        {
+          "value": "box",
+          "label": "Parcel"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "badge_4_text",
+      "label": "Badge 4 text",
+      "default": "Authorized Seller"
+    },
+    {
+      "type": "select",
+      "id": "badge_4_icon",
+      "label": "Badge 4 icon",
+      "default": "handshake",
+      "options": [
+        {
+          "value": "truck",
+          "label": "Delivery truck"
+        },
+        {
+          "value": "quality",
+          "label": "Quality medal"
+        },
+        {
+          "value": "money-back",
+          "label": "Money back"
+        },
+        {
+          "value": "handshake",
+          "label": "Handshake"
+        },
+        {
+          "value": "secure",
+          "label": "Lock"
+        },
+        {
+          "value": "shield",
+          "label": "Shield"
+        },
+        {
+          "value": "return",
+          "label": "Returns"
+        },
+        {
+          "value": "gift",
+          "label": "Gift"
+        },
+        {
+          "value": "star",
+          "label": "Star"
+        },
+        {
+          "value": "clock",
+          "label": "Clock"
+        },
+        {
+          "value": "box",
+          "label": "Parcel"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "badge_5_text",
+      "label": "Badge 5 text",
+      "default": "Secure Checkout"
+    },
+    {
+      "type": "select",
+      "id": "badge_5_icon",
+      "label": "Badge 5 icon",
+      "default": "secure",
+      "options": [
+        {
+          "value": "truck",
+          "label": "Delivery truck"
+        },
+        {
+          "value": "quality",
+          "label": "Quality medal"
+        },
+        {
+          "value": "money-back",
+          "label": "Money back"
+        },
+        {
+          "value": "handshake",
+          "label": "Handshake"
+        },
+        {
+          "value": "secure",
+          "label": "Lock"
+        },
+        {
+          "value": "shield",
+          "label": "Shield"
+        },
+        {
+          "value": "return",
+          "label": "Returns"
+        },
+        {
+          "value": "gift",
+          "label": "Gift"
+        },
+        {
+          "value": "star",
+          "label": "Star"
+        },
+        {
+          "value": "clock",
+          "label": "Clock"
+        },
+        {
+          "value": "box",
+          "label": "Parcel"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "badge_6_text",
+      "label": "Badge 6 text"
+    },
+    {
+      "type": "select",
+      "id": "badge_6_icon",
+      "label": "Badge 6 icon",
+      "default": "shield",
+      "options": [
+        {
+          "value": "truck",
+          "label": "Delivery truck"
+        },
+        {
+          "value": "quality",
+          "label": "Quality medal"
+        },
+        {
+          "value": "money-back",
+          "label": "Money back"
+        },
+        {
+          "value": "handshake",
+          "label": "Handshake"
+        },
+        {
+          "value": "secure",
+          "label": "Lock"
+        },
+        {
+          "value": "shield",
+          "label": "Shield"
+        },
+        {
+          "value": "return",
+          "label": "Returns"
+        },
+        {
+          "value": "gift",
+          "label": "Gift"
+        },
+        {
+          "value": "star",
+          "label": "Star"
+        },
+        {
+          "value": "clock",
+          "label": "Clock"
+        },
+        {
+          "value": "box",
+          "label": "Parcel"
+        }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "icon_size",
+      "label": "Icon size",
+      "min": 20,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 32
+    },
+    {
+      "type": "header",
+      "content": "Payment logos"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_payments",
+      "label": "Show payment logos",
+      "default": true,
+      "info": "Taken from your payment settings automatically."
+    },
+    {
+      "type": "text",
+      "id": "payments_heading",
+      "label": "Heading above logos",
+      "default": "Secure checkout with"
+    }
+  ]
+}
+{% endschema %}

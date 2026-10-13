@@ -1,0 +1,34 @@
+{%- comment -%} Product page: compact star rating that links to the reviews. {%- endcomment -%}
+{%- assign tk_rs = app.metafields.toolkit.reviews.value -%}
+{%- assign tk_product = block.settings.product | default: product -%}
+{%- assign tk_sum = tk_product.metafields.toolkit_reviews.summary.value -%}
+{%- if tk_sum.count > 0 -%}
+  <a class="tk-badge" href="#reviews" style="--tk-star: {{ tk_rs.starColor | default: '#f5a623' }}; justify-content: {{ block.settings.align }};">
+    {%- render 'tk-stars', rating: tk_sum.average -%}
+    <span>{{ tk_sum.average }} ({{ tk_sum.count }})</span>
+  </a>
+{%- elsif block.settings.show_empty -%}
+  <a class="tk-badge tk-muted" href="#reviews">No reviews yet</a>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Star rating",
+  "target": "section",
+  "stylesheet": "toolkit.css",
+  "settings": [
+    { "type": "product", "id": "product", "label": "Product", "autofill": true },
+    {
+      "type": "select",
+      "id": "align",
+      "label": "Alignment",
+      "default": "flex-start",
+      "options": [
+        { "value": "flex-start", "label": "Left" },
+        { "value": "center", "label": "Center" }
+      ]
+    },
+    { "type": "checkbox", "id": "show_empty", "label": "Show “No reviews yet” when there are none", "default": false }
+  ]
+}
+{% endschema %}

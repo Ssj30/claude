@@ -1,0 +1,43 @@
+# 911 Toolkit: one app that replaces the seven separate 911nights apps
+# (n8n Boekhouding, Stock Counter, Countdown Bar, Stellar Reviews, Sales Kit,
+# Bundle Deals, Checkout Kit). `shopify app config link` fills in client_id.
+client_id = ""
+name = "911 Toolkit"
+handle = "911-toolkit"
+application_url = "https://example.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[access_scopes]
+scopes = "read_products,write_products,read_inventory,read_orders,read_customers,read_discounts,write_discounts,read_themes"
+
+[auth]
+redirect_urls = ["https://example.com/api/auth"]
+
+# Storefront calls to /apps/toolkit/* are forwarded to /proxy/* (review form).
+[app_proxy]
+url = "/proxy"
+subpath = "toolkit"
+prefix = "apps"
+
+[webhooks]
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = ["app/uninstalled"]
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  # Bookkeeping forwards these to n8n; Sales Kit refreshes its "recent sales" feed.
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create", "orders/paid", "refunds/create" ]
+  uri = "/webhooks/orders"
+
+[pos]
+embedded = false
