@@ -1,0 +1,16 @@
+# Thank-you page block for Checkout Kit: shows the buyer a personal code for
+# their next order. Thank-you page extensions work on every Shopify plan.
+api_version = "2026-07"
+
+[[extensions]]
+name = "Thank-you reward"
+handle = "thank-you-reward"
+type = "ui_extension"
+
+[[extensions.targeting]]
+module = "./src/ThankYou.jsx"
+target = "purchase.thank-you.block.render"
+
+[extensions.capabilities]
+# Calls the app (/api/checkout/reward) to create the code.
+network_access = true

@@ -1,0 +1,34 @@
+{%- comment -%}
+  App embed: recent-sale pop-ups and the free-shipping bar. Settings live in the
+  911 Toolkit app → Sales Kit (app metafields toolkit.salesKit and toolkit.recent_sales).
+{%- endcomment -%}
+{%- assign tk_sk = app.metafields.toolkit.salesKit.value -%}
+{%- if tk_sk -%}
+  {%- if tk_sk.popupsEnabled or tk_sk.freeShippingEnabled -%}
+    <script type="application/json" id="tk-saleskit-config">
+      {
+        "settings": {{ tk_sk | json }},
+        "sales": {{ app.metafields.toolkit.recent_sales.value | json | default: '[]' }},
+        "cartTotal": {{ cart.total_price | json }},
+        "currency": {{ cart.currency.iso_code | json }},
+        "locale": {{ request.locale.iso_code | json }},
+        "template": {{ template.name | json }}
+      }
+    </script>
+    <script src="{{ 'sales-kit.js' | asset_url }}" defer></script>
+  {%- endif -%}
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Sales pop-ups & free shipping",
+  "target": "body",
+  "stylesheet": "toolkit.css",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Pop-ups and the free-shipping bar are set up in the 911 Toolkit app → Sales Kit."
+    }
+  ]
+}
+{% endschema %}

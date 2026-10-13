@@ -1,0 +1,69 @@
+{%- comment -%}
+  Product page: the volume offers ("Buy 2, save 10%"). The offers are the
+  automatic discounts managed in the 911 Toolkit app → Bundle Deals, so they
+  apply at checkout by themselves. Clicking a row sets the quantity.
+{%- endcomment -%}
+{%- assign tk_b = app.metafields.toolkit.bundles.value -%}
+{%- assign tk_tiers = app.metafields.toolkit.bundle_tiers.value -%}
+{%- assign tk_product = block.settings.product | default: product -%}
+{%- assign tk_count = 0 -%}
+{%- if tk_tiers and tk_product -%}
+  {%- capture tk_rows -%}
+    {%- for t in tk_tiers -%}
+      {%- assign tk_applies = false -%}
+      {%- if t.collections.size == 0 -%}
+        {%- assign tk_applies = true -%}
+      {%- else -%}
+        {%- for c in tk_product.collections -%}
+          {%- if t.collections contains c.handle -%}{%- assign tk_applies = true -%}{%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {%- if tk_applies -%}
+        {%- assign tk_count = tk_count | plus: 1 -%}
+        {%- assign tk_price = tk_product.selected_or_first_available_variant.price | times: t.minQty -%}
+        {%- assign tk_off = tk_price | times: t.percent | divided_by: 100 -%}
+        <button type="button" class="tk-tier" data-qty="{{ t.minQty }}" aria-pressed="false">
+          <span>
+            <strong>Buy {{ t.minQty }}</strong>
+            {%- if block.settings.show_price %} <span class="tk-muted">· {{ tk_price | minus: tk_off | money }} instead of <s>{{ tk_price | money }}</s></span>{% endif -%}
+          </span>
+          <span class="tk-tier__save">Save {{ t.percent }}%</span>
+        </button>
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endcapture -%}
+  {%- if tk_count > 0 -%}
+    <div class="tk-tiers" style="--tk-accent: {{ tk_b.highlightColor | default: '#111111' }};">
+      {%- if tk_b.heading != blank -%}<p class="tk-tiers__heading">{{ tk_b.heading | escape }}</p>{%- endif -%}
+      {%- if tk_b.note != blank -%}<p class="tk-tiers__note">{{ tk_b.note | escape }}</p>{%- endif -%}
+      {{ tk_rows }}
+    </div>
+    <script src="{{ 'bundle-tiers.js' | asset_url }}" defer></script>
+  {%- endif -%}
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Bundle offers",
+  "target": "section",
+  "stylesheet": "toolkit.css",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Offers, heading and colour are managed in the 911 Toolkit app → Bundle Deals."
+    },
+    {
+      "type": "product",
+      "id": "product",
+      "label": "Product",
+      "autofill": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_price",
+      "label": "Show the bundle price",
+      "default": true
+    }
+  ]
+}
+{% endschema %}

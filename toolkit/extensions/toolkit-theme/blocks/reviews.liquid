@@ -1,0 +1,132 @@
+{%- comment -%}
+  Product page: rating summary, reviews and the "Write a review" form.
+  Reviews are moderated in the 911 Toolkit app → Reviews and stored on the
+  product (metafields toolkit_reviews.summary and toolkit_reviews.list).
+{%- endcomment -%}
+{%- assign tk_rs = app.metafields.toolkit.reviews.value -%}
+{%- assign tk_product = block.settings.product | default: product -%}
+{%- assign tk_sum = tk_product.metafields.toolkit_reviews.summary.value -%}
+{%- assign tk_list = tk_product.metafields.toolkit_reviews.list.value -%}
+{%- assign tk_count = tk_sum.count | default: 0 -%}
+{%- assign tk_can_write = true -%}
+{%- if tk_rs.acceptSubmissions == false -%}{%- assign tk_can_write = false -%}{%- endif -%}
+{%- if tk_rs.showForm == false -%}{%- assign tk_can_write = false -%}{%- endif -%}
+{%- assign tk_heading = tk_rs.heading | default: 'Customer reviews' -%}
+
+{%- if tk_product -%}
+<div class="tk-reviews" id="reviews" style="--tk-star: {{ tk_rs.starColor | default: '#f5a623' }};" data-per-page="{{ block.settings.per_page }}">
+  <div class="tk-reviews__head">
+    <div>
+      <h2 class="tk-reviews__title h3">{{ tk_heading | escape }}</h2>
+      {%- if tk_count > 0 -%}
+        <div class="tk-reviews__avg">
+          {%- render 'tk-stars', rating: tk_sum.average -%}
+          <span>{{ tk_sum.average }} · {{ tk_count }} {% if tk_count == 1 %}review{% else %}reviews{% endif %}</span>
+        </div>
+      {%- else -%}
+        <p class="tk-muted">No reviews yet{% if tk_can_write %}. Be the first to share what you think{% endif %}.</p>
+      {%- endif -%}
+    </div>
+    {%- if tk_can_write -%}
+      <button type="button" class="tk-btn" data-tk-write aria-expanded="false" aria-controls="tk-form-{{ block.id }}">Write a review</button>
+    {%- endif -%}
+  </div>
+
+  {%- if tk_can_write -%}
+    <form class="tk-form" id="tk-form-{{ block.id }}" hidden novalidate>
+      <input type="hidden" name="product_id" value="{{ tk_product.id }}">
+      <div class="tk-hp" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+      <fieldset class="tk-rate">
+        <legend class="tk-sr">Your rating</legend>
+        {%- for i in (1..5) reversed -%}
+          <input type="radio" name="rating" value="{{ i }}" id="tk-r{{ i }}-{{ block.id }}" required>
+          <label for="tk-r{{ i }}-{{ block.id }}" title="{{ i }} star{% if i > 1 %}s{% endif %}">★</label>
+        {%- endfor -%}
+      </fieldset>
+      <label>Name <input type="text" name="author" maxlength="60" required autocomplete="given-name"></label>
+      <label>Email (not shown) <input type="email" name="email" maxlength="120" autocomplete="email"></label>
+      <label>Title <input type="text" name="title" maxlength="120"></label>
+      <label>Review <textarea name="body" rows="4" maxlength="3000" required></textarea></label>
+      <p class="tk-form__msg" role="status"></p>
+      <div><button type="submit" class="tk-btn tk-btn--solid">Send review</button></div>
+    </form>
+  {%- endif -%}
+
+  {%- for r in tk_list -%}
+    <article class="tk-review"{% if forloop.index > block.settings.per_page %} hidden{% endif %}>
+      <div class="tk-review__meta">
+        {%- render 'tk-stars', rating: r.rating -%}
+        <strong>{{ r.author | escape }}</strong>
+        {%- if r.verified -%}<span class="tk-muted">· {{ 'reviews.verified' | t }}</span>{%- endif -%}
+        {%- if block.settings.show_dates -%}<span class="tk-muted">· {{ r.date | date: '%e %b %Y' }}</span>{%- endif -%}
+      </div>
+      {%- if r.title != blank -%}<p class="tk-review__title">{{ r.title | escape }}</p>{%- endif -%}
+      <p class="tk-review__body">{{ r.body | escape }}</p>
+    </article>
+  {%- endfor -%}
+  {%- if tk_list.size > block.settings.per_page -%}
+    <p><button type="button" class="tk-btn" data-tk-more>Show more reviews</button></p>
+  {%- endif -%}
+</div>
+
+{%- if tk_count > 0 and block.settings.rich_snippets -%}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "@id": {{ request.origin | append: tk_product.url | append: '#product' | json }},
+  "name": {{ tk_product.title | json }},
+  "url": {{ request.origin | append: tk_product.url | json }},
+  "aggregateRating": { "@type": "AggregateRating", "ratingValue": {{ tk_sum.average | json }}, "reviewCount": {{ tk_count | json }}, "bestRating": 5, "worstRating": 1 },
+  "review": [
+    {%- for r in tk_list limit: 5 -%}
+    { "@type": "Review", "author": { "@type": "Person", "name": {{ r.author | json }} }, "datePublished": {{ r.date | json }}, "reviewBody": {{ r.body | json }}, "reviewRating": { "@type": "Rating", "ratingValue": {{ r.rating | json }}, "bestRating": 5 } }{% unless forloop.last %},{% endunless %}
+    {%- endfor -%}
+  ]
+}
+</script>
+{%- endif -%}
+<script src="{{ 'reviews.js' | asset_url }}" defer></script>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Reviews",
+  "target": "section",
+  "stylesheet": "toolkit.css",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Approve reviews, change the heading and star colour in the 911 Toolkit app → Reviews."
+    },
+    {
+      "type": "product",
+      "id": "product",
+      "label": "Product",
+      "autofill": true
+    },
+    {
+      "type": "range",
+      "id": "per_page",
+      "label": "Reviews shown before “Show more”",
+      "min": 2,
+      "max": 20,
+      "step": 1,
+      "default": 5
+    },
+    {
+      "type": "checkbox",
+      "id": "show_dates",
+      "label": "Show dates",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "rich_snippets",
+      "label": "Show stars in Google results",
+      "info": "Adds review data for search engines.",
+      "default": true
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,23 @@
+{%- comment -%}
+  App embed: the countdown bar. Settings come from the app (Countdown Bar page),
+  stored in the app metafield toolkit.countdown.
+{%- endcomment -%}
+{%- assign tk_cd = app.metafields.toolkit.countdown.value -%}
+{%- if tk_cd and tk_cd.enabled -%}
+  <script type="application/json" id="tk-countdown-config">{{ tk_cd | json }}</script>
+  <script src="{{ 'countdown-bar.js' | asset_url }}" defer></script>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Countdown bar",
+  "target": "body",
+  "stylesheet": "toolkit.css",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Text, end time and colours are set in the 911 Toolkit app → Countdown Bar."
+    }
+  ]
+}
+{% endschema %}

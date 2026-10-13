@@ -1,0 +1,40 @@
+{%- comment -%} Any page: the shop's best recent reviews (4★ and up) in a swipeable row. {%- endcomment -%}
+{%- assign tk_rs = app.metafields.toolkit.reviews.value -%}
+{%- assign tk_f = app.metafields.toolkit.featured_reviews.value -%}
+{%- if tk_f and tk_f.reviews.size > 0 -%}
+  <div class="tk-carousel page-width" style="--tk-star: {{ tk_rs.starColor | default: '#f5a623' }};">
+    <div class="tk-carousel__head">
+      {%- if block.settings.heading != blank -%}<h2 class="h2">{{ block.settings.heading | escape }}</h2>{%- endif -%}
+      {%- if block.settings.show_summary -%}
+        <p>{%- render 'tk-stars', rating: tk_f.average -%} {{ tk_f.average }} out of 5 · based on {{ tk_f.count }} reviews</p>
+      {%- endif -%}
+    </div>
+    <div class="tk-carousel__track" tabindex="0" role="region" aria-label="{{ block.settings.heading | default: 'Customer reviews' | escape }}">
+      {%- for r in tk_f.reviews limit: block.settings.limit -%}
+        <figure class="tk-card">
+          {%- render 'tk-stars', rating: r.rating -%}
+          {%- if r.title != blank -%}<p><strong>{{ r.title | escape }}</strong></p>{%- endif -%}
+          <blockquote style="margin:0"><p>{{ r.body | escape | truncate: 220 }}</p></blockquote>
+          <figcaption class="tk-muted">
+            {{ r.author | escape }}
+            {%- if block.settings.show_product and r.handle != blank -%} · <a href="{{ routes.root_url | append: 'products/' | append: r.handle | replace: '//', '/' }}">{{ r.product | escape }}</a>{%- endif -%}
+          </figcaption>
+        </figure>
+      {%- endfor -%}
+    </div>
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Reviews carousel",
+  "target": "section",
+  "stylesheet": "toolkit.css",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Our customers love us" },
+    { "type": "checkbox", "id": "show_summary", "label": "Show average rating", "default": true },
+    { "type": "checkbox", "id": "show_product", "label": "Link to the product", "default": true },
+    { "type": "range", "id": "limit", "label": "Number of reviews", "min": 3, "max": 16, "step": 1, "default": 12 }
+  ]
+}
+{% endschema %}
